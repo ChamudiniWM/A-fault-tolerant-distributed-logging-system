@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+option java_package = "com.group6.logsystem.grpc";
+option java_outer_classname = "LogProto";
+option java_multiple_files = true;
+
+package logsystem;
+
+service LogService {
+  rpc sendLog (LogRequest) returns (LogResponse);
+  rpc queryLogs (QueryRequest) returns (LogList);
+}
+
+message LogRequest {
+  string nodeId = 1;
+  string message = 2;
+  int64 timestamp = 3;
+}
+
+message LogResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message QueryRequest {
+  string nodeId = 1;
+  int64 startTime = 2;
+  int64 endTime = 3;
+}
+
+message LogEntry {
+  string nodeId = 1;
+  string message = 2;
+  int64 timestamp = 3;
+}
+
+message LogList {
+  repeated LogEntry logs = 1;
+}
