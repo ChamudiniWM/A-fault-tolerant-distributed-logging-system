@@ -1,32 +1,37 @@
 package com.group6.logsystem.grpc;
 
+import com.group6.logsystem.consensus.ConsensusModule;
+import com.group6.logsystem.consensus.RaftNode;
 import com.group6.logsystem.interfaces.ILogService;
 import com.group6.logsystem.models.InternalLogEntry;
-
 import java.util.ArrayList;
 import java.util.List;
 
 public class LogServiceImplAdapter implements ILogService {
 
-    private final List<InternalLogEntry> logEntries = new ArrayList<>();
+    private final RaftNode raftNode;
+    private final ConsensusModule consensusModule;
+
+    // Updated constructor to take both RaftNode and ConsensusModule
+    public LogServiceImplAdapter(RaftNode raftNode, ConsensusModule consensusModule) {
+        this.raftNode = raftNode;
+        this.consensusModule = consensusModule;
+    }
 
     @Override
     public void appendLog(InternalLogEntry entry) {
-        synchronized (logEntries) {
-            logEntries.add(entry);
-        }
+        // Delegate log request to ConsensusModule
+        consensusModule.handleClientLogRequest(entry);
     }
 
     @Override
     public List<InternalLogEntry> queryLogs(String nodeId, long startTime, long endTime) {
         List<InternalLogEntry> results = new ArrayList<>();
-        synchronized (logEntries) {
-            for (InternalLogEntry entry : logEntries) {
-                if (entry.getTimestamp() >= startTime &&
-                        entry.getTimestamp() <= endTime &&
-                        entry.getNodeId().equals(nodeId)) {
-                    results.add(entry);
-                }
+        for (InternalLogEntry entry : raftNode.getCommittedEntries()) {
+            if (entry.getTimestamp() >= startTime &&
+                    entry.getTimestamp() <= endTime &&
+                    entry.getNodeId().equals(nodeId)) {
+                results.add(entry);
             }
         }
         return results;
@@ -34,8 +39,6 @@ public class LogServiceImplAdapter implements ILogService {
 
     @Override
     public List<InternalLogEntry> getAllLogs() {
-        synchronized (logEntries) {
-            return new ArrayList<>(logEntries);
-        }
+        return raftNode.getCommittedEntries();
     }
 }
