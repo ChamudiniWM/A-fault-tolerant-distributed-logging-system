@@ -8,11 +8,14 @@ public class LogEntryConverter {
     // gRPC → Internal
     public static InternalLogEntry fromProto(LogEntry protoEntry) {
         return new InternalLogEntry(
+                protoEntry.getIndex(),
                 protoEntry.getNodeId(),
                 protoEntry.getMessage(),
-                protoEntry.getTimestamp()
+                protoEntry.getTimestamp(),
+                protoEntry.getTerm()
         );
     }
+
 
     // Internal → gRPC
     public static LogEntry toProto(InternalLogEntry logEntry) {
