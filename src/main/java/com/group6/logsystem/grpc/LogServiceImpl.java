@@ -1,26 +1,33 @@
 package com.group6.logsystem.grpc;
 
+import com.group6.logsystem.models.InternalLogEntry;
+import com.group6.logsystem.util.LogEntryConverter;
+
 import io.grpc.stub.StreamObserver;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
 
-    private final List<LogEntry> logEntries = new ArrayList<>();
+    private final List<InternalLogEntry> logEntries = new ArrayList<>();
 
     @Override
     public void sendLog(LogRequest request, StreamObserver<LogResponse> responseObserver) {
-        LogEntry entry = LogEntry.newBuilder()
-                .setNodeId(request.getNodeId())
-                .setMessage(request.getMessage())
-                .setTimestamp(request.getTimestamp())
-                .build();
+        // Convert proto to internal model
+        InternalLogEntry entry = new InternalLogEntry(
+                request.getNodeId(),
+                request.getMessage(),
+                request.getTimestamp()
+        );
 
-        // For now, just save it in memory
+        // Save internally
         synchronized (logEntries) {
             logEntries.add(entry);
         }
 
+        // Respond to client
         LogResponse response = LogResponse.newBuilder()
                 .setSuccess(true)
                 .setMessage("Log received from node: " + request.getNodeId())
@@ -32,20 +39,23 @@ public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
 
     @Override
     public void queryLogs(QueryRequest request, StreamObserver<LogList> responseObserver) {
-        List<LogEntry> results = new ArrayList<>();
+        List<InternalLogEntry> results;
 
         synchronized (logEntries) {
-            for (LogEntry entry : logEntries) {
-                if (entry.getTimestamp() >= request.getStartTime() &&
-                        entry.getTimestamp() <= request.getEndTime() &&
-                        entry.getNodeId().equals(request.getNodeId())) {
-                    results.add(entry);
-                }
-            }
+            results = logEntries.stream()
+                    .filter(entry -> entry.getTimestamp() >= request.getStartTime()
+                            && entry.getTimestamp() <= request.getEndTime()
+                            && entry.getNodeId().equals(request.getNodeId()))
+                    .toList();
         }
 
+        // Convert internal logs back to proto
+        List<com.group6.logsystem.grpc.LogEntry> protoLogs = results.stream()
+                .map(LogEntryConverter::toProto)
+                .collect(Collectors.toList());
+
         LogList logList = LogList.newBuilder()
-                .addAllLogs(results)
+                .addAllLogs(protoLogs)
                 .build();
 
         responseObserver.onNext(logList);
