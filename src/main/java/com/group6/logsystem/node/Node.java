@@ -8,7 +8,6 @@ import com.group6.logsystem.grpc.LogResponse;
 import com.group6.logsystem.grpc.LogServiceGrpc;
 import com.group6.logsystem.models.InternalLogEntry;
 import com.group6.logsystem.util.ConfigLoader;
-import com.group6.logsystem.grpc.LogEntry;
 
 
 //Import Time Sync utilities
