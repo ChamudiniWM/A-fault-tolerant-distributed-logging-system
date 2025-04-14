@@ -101,7 +101,7 @@ public class Node {
         LogRequest request = LogRequest.newBuilder()
                 .setNodeId(nodeId)
                 .setMessage(logEntry.getMessage())
-                .setTimestamp(updatedTimestamp)
+                .setTimestamp(logEntry.getTimestamp())
                 .setTerm(logEntry.getTerm())
                 .build();
 
@@ -114,7 +114,9 @@ public class Node {
     }
 
     // Append a log entry locally
-    public void appendLog(InternalLogEntry logEntry) {
+    public void appendLog(LogEntry logEntry) {
+        
+
         // Update logical clock based on received timestamp
         long updatedTimestamp = logicalClock.receive(logEntry.getTimestamp());
 
@@ -127,7 +129,7 @@ public class Node {
         // Optional: Flush the logs in timestamp order
         timestampCorrector.flushLogsInOrder(); // This ensures out-of-order logs are handled
 
-        // Add log to the local log
+        
         logs.add(logEntry);
         System.out.println("Log entry appended to node " + nodeId + ": " + logEntry.getMessage());
     }
@@ -142,13 +144,11 @@ public class Node {
     }
 
     public List<LogEntry> getLogs() {
-        return logs.stream()
-                .map(InternalLogEntry::toProto)  // This converts InternalLogEntry to LogEntry
-                .collect(Collectors.toList());   // Collect into a List<LogEntry>
+        return logs;
     }
-
 
     public ConsensusModule getConsensusModule() {
         return consensusModule;
     }
 }
+
