@@ -1,27 +1,36 @@
 package com.group6.logsystem.timesync;
 
-import java.time.Instant;
+import com.group6.logsystem.grpc.LogEntry;
 
 public class TimeSyncManager {
 
-    private static final String NTP_SERVER = "time.google.com"; // Placeholder
+    private final LogicalClock logicalClock;
+    private final LogTimestampCorrector timestampCorrector;
 
-    public static long getNetworkTimeMillis() {
-        try {
-            // In actual implementation, use an NTP client or trusted source
-            return Instant.now().toEpochMilli();  // simulate network time
-        } catch (Exception e) {
-            return System.currentTimeMillis();
-        }
+    public TimeSyncManager() {
+        this.logicalClock = new LogicalClock();
+        this.timestampCorrector = new LogTimestampCorrector();
     }
 
-    public static long calculateClockOffset() {
-        long localTime = System.currentTimeMillis();
-        long networkTime = getNetworkTimeMillis();
-        return networkTime - localTime;
+    // Method to update the timestamp for an incoming log entry
+    public long synchronizeTimestamp(LogEntry logEntry) {
+        // First, update the logical clock when receiving a log
+        long updatedTimestamp = logicalClock.receive(logEntry.getTimestamp());
+
+        // Then, correct the log's timestamp if necessary
+        logEntry.setTimestamp(updatedTimestamp);
+        timestampCorrector.bufferLog(logEntry);
+
+        return updatedTimestamp;
     }
 
-    public static long getCorrectedTimestamp() {
-        return System.currentTimeMillis() + calculateClockOffset();
+    // Method to flush and reorder the logs in timestamp order
+    public void flushLogs() {
+        timestampCorrector.flushLogsInOrder();
+    }
+
+    // Getter for the logical clock
+    public LogicalClock getLogicalClock() {
+        return logicalClock;
     }
 }
