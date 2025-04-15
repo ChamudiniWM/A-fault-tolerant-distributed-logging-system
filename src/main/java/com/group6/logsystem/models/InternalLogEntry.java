@@ -19,6 +19,12 @@ public class InternalLogEntry {
         this.term = term;
     }
 
+     // When converting to InternalLogEntry, the timestamp will be updated
+    public InternalLogEntry updateTimestamp(long newTimestamp) {
+        this.timestamp = newTimestamp;
+        return this;
+    }
+    
     public int getIndex() {
         return index;
     }
