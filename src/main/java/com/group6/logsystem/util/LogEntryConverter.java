@@ -23,6 +23,7 @@ public class LogEntryConverter {
                 .setNodeId(logEntry.getNodeId())
                 .setMessage(logEntry.getMessage())
                 .setTimestamp(logEntry.getTimestamp())
+                .setTerm(logEntry.getTerm())
                 .build();
     }
 }
