@@ -115,7 +115,7 @@ public class Node {
 
     // Append a log entry locally
     public void appendLog(LogEntry logEntry) {
-        
+
 
         // Update logical clock based on received timestamp
         long updatedTimestamp = logicalClock.receive(logEntry.getTimestamp());
@@ -129,7 +129,7 @@ public class Node {
         // Optional: Flush the logs in timestamp order
         timestampCorrector.flushLogsInOrder(); // This ensures out-of-order logs are handled
 
-        
+
         logs.add(logEntry);
         System.out.println("Log entry appended to node " + nodeId + ": " + logEntry.getMessage());
     }
@@ -151,4 +151,3 @@ public class Node {
         return consensusModule;
     }
 }
-
