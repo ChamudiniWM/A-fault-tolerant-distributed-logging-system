@@ -11,7 +11,7 @@ public class LogicalClock {
         return ++clock;
     }
 
-    public long receive(long receivedTimestamp) {
+    public synchronized long receive(long receivedTimestamp) {
         clock = Math.max(clock, receivedTimestamp) + 1;
         return clock;
     }
