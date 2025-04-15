@@ -5,11 +5,16 @@ import com.group6.logsystem.consensus.RaftNode;
 import com.group6.logsystem.models.InternalLogEntry;
 import io.grpc.stub.StreamObserver;
 
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+
 public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
 
     private final LogServiceImplAdapter adapter;
     private final RaftNode raftNode;
     private final ConsensusModule consensusModule;
+    private final Set<String> seenLogIds = Collections.synchronizedSet(new HashSet<>());
 
     // Constructor to initialize RaftNode, ConsensusModule, and LogServiceImplAdapter
     public LogServiceImpl(RaftNode raftNode, ConsensusModule consensusModule) {
@@ -117,6 +122,7 @@ public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
 
         for (LogEntry entry : request.getEntriesList()) {
             InternalLogEntry internalLogEntry = new InternalLogEntry(
+                    entry.getLogId(), // Assuming logId is part of the LogEntry
                     nextIndex++,
                     entry.getNodeId(),
                     entry.getMessage(),
@@ -140,4 +146,47 @@ public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
+
+
+    @Override
+    public void sendLog(LogRequest request , StreamObserver<LogResponse> responseObserver) {
+        // Check if the log ID has already been seen
+        if (seenLogIds.contains(request.getLogId())) {
+            System.out.println("Duplicate Log Entry , Ignoring the log : " + request.getLogId());
+            LogResponse response = LogResponse.newBuilder()
+                    .setSuccess(true)
+                    .setMessage("Duplicate Log Entry , Ignoring the log : " + request.getLogId())
+                    .build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+            return;
+        }
+
+        // Add the log ID to the seen set
+        seenLogIds.add(request.getLogId());
+
+        // Convert the request to an InternalLogEntry
+        InternalLogEntry internalLogEntry = new InternalLogEntry(
+                request.getLogId(),
+                raftNode.getNextLogIndex(), // Assuming this is the next index
+                request.getNodeId(),
+                request.getMessage(),
+                request.getTimestamp(),
+                request.getTerm() // Assuming term is not provided in the request
+        );
+
+        consensusModule.handleClientLogRequest(internalLogEntry);
+
+        // Create a response
+        LogResponse response = LogResponse.newBuilder()
+                .setSuccess(true)
+                .setMessage("Log entry received and processed: " + request.getLogId())
+                .build();
+
+        // Send the response
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+
 }

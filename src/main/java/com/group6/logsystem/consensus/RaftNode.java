@@ -14,7 +14,9 @@ public class RaftNode {
     public enum Role {
         LEADER, FOLLOWER, CANDIDATE
     }
-
+    private final Set<String> seenLogIds = Collections.synchronizedSet(new HashSet<>());
+    private final Map<String, List<InternalLogEntry>> nodeIdIndex = new ConcurrentHashMap<>();
+    private final Map<Long, List<InternalLogEntry>> timestampIndex = new ConcurrentHashMap<>();
     private static class RaftLogEntry {
         private final int term;
         private final InternalLogEntry entry;
@@ -109,11 +111,39 @@ public class RaftNode {
     }
 
     public synchronized void appendLogEntry(InternalLogEntry entry) {
+        if (entry.getLogId() == null || entry.getLogId().isEmpty()) {
+            throw new IllegalArgumentException("Log ID cannot be null or empty");
+        }
+        if (seenLogIds.contains(entry.getLogId())) {
+            System.out.println("Duplicate log entry detected: " + entry.getLogId());
+            return;
+        }
         if (this.role != Role.LEADER) {
             System.out.println(nodeId + " is not the leader. Rejecting log append.");
             return;
         }
+        seenLogIds.add(entry.getLogId());
         log.add(new RaftLogEntry(currentTerm, entry));
+        nodeIdIndex.computeIfAbsent(entry.getNodeId(), k -> new ArrayList<>()).add(entry);
+        timestampIndex.computeIfAbsent(entry.getTimestamp(), k -> new ArrayList<>()).add(entry);
+        System.out.println("Updated nodeIdIndex for " + entry.getNodeId() + ": " + nodeIdIndex.get(entry.getNodeId()));
+        System.out.println("Log entry appended: " + entry.getMessage() + " by " + entry.getNodeId());
+    }
+    public List<InternalLogEntry> queryLogs(String nodeId, long startTime, long endTime) {
+        System.out.println("Running queryLogs - VERSION 2025-04-15");
+        List<InternalLogEntry> results = new ArrayList<>();
+        List<InternalLogEntry> nodeEntries = nodeIdIndex.getOrDefault(nodeId, new ArrayList<>());
+        System.out.println("Entries for nodeId " + nodeId + ": " + nodeEntries);
+        for (InternalLogEntry entry : nodeEntries) {
+            System.out.println("Checking entry: " + entry + " | Timestamp: " + entry.getTimestamp() +
+                    " | Range: [" + startTime + ", " + endTime + "]");
+            if (entry.getTimestamp() >= startTime && entry.getTimestamp() <= endTime) {
+                results.add(entry);
+            }
+        }
+        System.out.println("Filtered results for nodeId " + nodeId + ": " + results);
+        results.sort((e1, e2) -> Long.compare(e1.getTimestamp(), e2.getTimestamp()));
+        return results;
     }
 
     public synchronized int getCommitIndex() {

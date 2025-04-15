@@ -26,14 +26,8 @@ public class LogServiceImplAdapter implements ILogService {
 
     @Override
     public List<InternalLogEntry> queryLogs(String nodeId, long startTime, long endTime) {
-        List<InternalLogEntry> results = new ArrayList<>();
-        for (InternalLogEntry entry : raftNode.getCommittedEntries()) {
-            if (entry.getTimestamp() >= startTime &&
-                    entry.getTimestamp() <= endTime &&
-                    entry.getNodeId().equals(nodeId)) {
-                results.add(entry);
-            }
-        }
+        List<InternalLogEntry> results = raftNode.queryLogs(nodeId, startTime, endTime);
+        System.out.println("LogServiceImplAdapter returning for nodeId " + nodeId + ": " + results);
         return results;
     }
 
