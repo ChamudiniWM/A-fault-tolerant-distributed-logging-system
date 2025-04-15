@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -28,7 +29,7 @@ class ReplicationTest {
 
     @Test
     void testAppendLogAsLeader() {
-        InternalLogEntry entry = new InternalLogEntry(
+        InternalLogEntry entry = new InternalLogEntry(UUID.randomUUID().toString(),1,
                 "node1",
                 "System started",
                 System.currentTimeMillis(),
@@ -51,7 +52,7 @@ class ReplicationTest {
     void testRejectAppendWhenNotLeader() {
         raftNode.becomeFollower(raftNode.getCurrentTerm()); // Demote to follower
 
-        InternalLogEntry entry = new InternalLogEntry(
+        InternalLogEntry entry = new InternalLogEntry(UUID.randomUUID().toString(),1,
                 "node1",
                 "Should not be committed",
                 System.currentTimeMillis(),

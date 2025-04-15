@@ -13,6 +13,7 @@ import io.grpc.stub.StreamObserver;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 public class ConsensusModule {
 
@@ -80,6 +81,7 @@ public class ConsensusModule {
         if (raftNode.getRole() == RaftNode.Role.FOLLOWER) {
             int nextIndex = raftNode.getNextLogIndex(); // or use log.size() or similar
             InternalLogEntry entry = new InternalLogEntry(
+                    request.getLogId(),
                     nextIndex,
                     request.getNodeId(),
                     request.getMessage(),
@@ -182,6 +184,7 @@ public class ConsensusModule {
 
     // New method to handle client log request
     public void handleClientLogRequest(InternalLogEntry entry) {
+        long startTime = System.nanoTime();
         if (raftNode.getRole() != RaftNode.Role.LEADER) {
             System.out.println("Rejected log entry: " + raftNode.getNodeId() + " is not the leader.");
             return;
@@ -191,7 +194,11 @@ public class ConsensusModule {
         raftNode.appendLogEntry(entry);
         System.out.println("Log entry appended by leader: " + entry);
 
+
+
         // Replicate the log to followers (log replication)
         initiateLogReplication();
+        long endTime = System.nanoTime();
+        System.out.println("Log replication took " + (endTime - startTime) / 1_000_000 + " ms");
     }
 }

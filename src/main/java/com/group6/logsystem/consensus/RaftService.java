@@ -49,6 +49,7 @@ public class RaftService extends LogServiceGrpc.LogServiceImplBase {
         for (LogEntry entry : request.getEntriesList()) {
             int nextIndex = raftNode.getNextLogIndex(); // <-- You should implement this in RaftNode
             InternalLogEntry internalLogEntry = new InternalLogEntry(
+                    entry.getLogId(),  // Assuming logId is part of the LogEntry
                     nextIndex,
                     entry.getNodeId(),
                     entry.getMessage(),

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -26,7 +27,7 @@ class ConflictResolutionTest {
 
         // Force node1 to become leader with stale log
         staleLeader.becomeLeader();
-        InternalLogEntry staleEntry = new InternalLogEntry("node1", "old_log_entry", System.currentTimeMillis(), 1);
+        InternalLogEntry staleEntry = new InternalLogEntry(UUID.randomUUID().toString(),1,"node1", "old_log_entry", System.currentTimeMillis(), 1);
         staleLeader.appendLogEntry(staleEntry);
 
         // Simulate partition (no replication to node2)
@@ -36,7 +37,7 @@ class ConflictResolutionTest {
         newLeader.becomeFollower(2); // Update term
         newLeader.becomeCandidate();
         newLeader.becomeLeader();
-        InternalLogEntry correctEntry = new InternalLogEntry("node2", "correct_log_entry", System.currentTimeMillis(), 2);
+        InternalLogEntry correctEntry = new InternalLogEntry(UUID.randomUUID().toString(),2,"node2", "correct_log_entry", System.currentTimeMillis(), 2);
         newLeader.appendLogEntry(correctEntry);
     }
 

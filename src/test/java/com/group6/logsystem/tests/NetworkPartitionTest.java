@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -64,7 +65,7 @@ class NetworkPartitionTest {
     @Test
     void testLogNotCommittedDuringPartition() {
         // Append an entry while partitioned (no replication possible)
-        InternalLogEntry entry = new InternalLogEntry(
+        InternalLogEntry entry = new InternalLogEntry(UUID.randomUUID().toString(),1,
                 "node1", "Partitioned log", System.currentTimeMillis(), raftNode.getCurrentTerm()
         );
 

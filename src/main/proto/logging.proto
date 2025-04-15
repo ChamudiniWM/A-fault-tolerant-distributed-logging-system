@@ -25,6 +25,7 @@ message LogRequest {
   string message = 2;
   int64 timestamp = 3;
   int32 term = 4;
+  string logId = 5;
 }
 
 message LogResponse {
@@ -44,6 +45,7 @@ message LogEntry {
   string message = 3;
   int64 timestamp = 4;
   int32 term = 5;
+  string logId = 6;
 }
 
 message LogList {
