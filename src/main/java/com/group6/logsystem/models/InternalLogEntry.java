@@ -9,7 +9,7 @@ public class InternalLogEntry {
     private final int index;       // New field for log index
     private final String nodeId;
     private final String message;
-    private final long timestamp;
+    private long timestamp;
     private final int term;
 
     public InternalLogEntry(String logId,int index, String nodeId, String message, long timestamp, int term) {
@@ -20,6 +20,13 @@ public class InternalLogEntry {
         this.timestamp = timestamp;
         this.term = term;
     }
+
+    // When converting to InternalLogEntry, the timestamp will be updated
+    public InternalLogEntry updateTimestamp(long newTimestamp) {
+        this.timestamp = newTimestamp;
+        return this;
+    }
+
 
     public String getLogId() {
         return logId;

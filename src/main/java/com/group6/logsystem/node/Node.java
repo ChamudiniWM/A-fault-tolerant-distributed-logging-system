@@ -8,6 +8,10 @@ import com.group6.logsystem.grpc.LogResponse;
 import com.group6.logsystem.grpc.LogServiceGrpc;
 import com.group6.logsystem.util.ConfigLoader;
 
+//Import Time Sync utilities
+import com.group6.logsystem.timesync.LogicalClock;
+import com.group6.logsystem.timesync.LogTimestampCorrector;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +25,12 @@ public class Node {
     private final List<LogEntry> logs;
     private final LogServiceGrpc.LogServiceBlockingStub logServiceStub;
     private final ConsensusModule consensusModule;
+
+
+    // Time Synchronization Modules
+    private final LogicalClock logicalClock = new LogicalClock();
+    private final LogTimestampCorrector timestampCorrector = new LogTimestampCorrector();
+
 
     // Load configuration and set up peer list and peer address
     private static List<String> peersList;
@@ -84,6 +94,9 @@ public class Node {
             return;
         }
 
+        // Apply logical clock timestamp
+        long updatedTimestamp = logicalClock.tick();
+
         LogRequest request = LogRequest.newBuilder()
                 .setNodeId(nodeId)
                 .setMessage(logEntry.getMessage())
@@ -101,6 +114,19 @@ public class Node {
 
     // Append a log entry locally
     public void appendLog(LogEntry logEntry) {
+
+        // Update logical clock based on received timestamp
+        long updatedTimestamp = logicalClock.receive(logEntry.getTimestamp());
+
+        // Adjust log entry timestamp if necessary
+        logEntry.setTimestamp(updatedTimestamp);
+
+        // Buffer and reorder logs
+        timestampCorrector.bufferLog(logEntry);
+
+        // Optional: Flush the logs in timestamp order
+        timestampCorrector.flushLogsInOrder(); // This ensures out-of-order logs are handled
+
         logs.add(logEntry);
         System.out.println("Log entry appended to node " + nodeId + ": " + logEntry.getMessage());
     }
