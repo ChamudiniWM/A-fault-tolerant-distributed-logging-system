@@ -2,10 +2,13 @@ package com.group6.logsystem.grpc;
 
 import com.group6.logsystem.consensus.RaftNode;
 import com.group6.logsystem.consensus.ConsensusModule;
+import com.group6.logsystem.consensus.LeaderElectionService;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class GrpcServer {
 
@@ -23,15 +26,34 @@ public class GrpcServer {
         int nodeNum = Integer.parseInt(nodeId.replaceAll("[^0-9]", ""));
         int grpcPort = 50050 + nodeNum;
 
-        // Initialize RaftNode
-        RaftNode raftNode = new RaftNode(nodeId, Arrays.asList(peerIds));
-        raftNode.start();
+        // Create a list of peer node IDs
+        List<String> peerList = Arrays.asList(peerIds);
 
-        // You might later pass peer addresses too — for now, keep it simple
-        ConsensusModule consensusModule = new ConsensusModule(raftNode, "localhost:" + (grpcPort + 1));
+        // Step 1: Create a temporary RaftNode without the LeaderElectionService
+        RaftNode localNode = new RaftNode(nodeId, peerList, null);
 
-        LogServiceImpl logService = new LogServiceImpl(raftNode, consensusModule);
+        // Step 2: Create a list of RaftNode objects for peers (with dummy LeaderElectionService or null)
+        List<RaftNode> peerRaftNodes = new ArrayList<>();
+        for (String peerId : peerList) {
+            peerRaftNodes.add(new RaftNode(peerId, peerList, null));
+        }
 
+        // Step 3: Create the LeaderElectionService
+        LeaderElectionService leaderElectionService = new LeaderElectionService(localNode, peerRaftNodes);
+
+        // Step 4: Recreate the local RaftNode with the actual LeaderElectionService
+        localNode = new RaftNode(nodeId, peerList, leaderElectionService);
+
+        // Step 5: Start the local RaftNode (contains delay before election begins)
+        localNode.start();
+
+        // Step 6: Initialize ConsensusModule
+        ConsensusModule consensusModule = new ConsensusModule(localNode, "localhost:" + (grpcPort + 1));
+
+        // Step 7: Create the LogService
+        LogServiceImpl logService = new LogServiceImpl(localNode, consensusModule);
+
+        // Step 8: Start the gRPC server
         Server server = ServerBuilder
                 .forPort(grpcPort)
                 .addService(logService)

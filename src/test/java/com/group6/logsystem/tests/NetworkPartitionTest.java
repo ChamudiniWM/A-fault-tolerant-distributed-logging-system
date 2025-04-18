@@ -65,8 +65,13 @@ class NetworkPartitionTest {
     void testLogNotCommittedDuringPartition() {
         // Append an entry while partitioned (no replication possible)
         InternalLogEntry entry = new InternalLogEntry(
-                "node1", "Partitioned log", System.currentTimeMillis(), raftNode.getCurrentTerm()
+                raftNode.getCurrentTerm(),     // term
+                "node1",                       // nodeId
+                "Partitioned log",            // message
+                System.currentTimeMillis(),   // timestamp
+                1                             // index (set appropriately)
         );
+
 
         raftNode.appendLogEntry(entry);
 

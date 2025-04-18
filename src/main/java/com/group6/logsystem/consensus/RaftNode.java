@@ -15,7 +15,7 @@ public class RaftNode {
         LEADER, FOLLOWER, CANDIDATE
     }
 
-    private static class RaftLogEntry {
+    public static class RaftLogEntry {
         private final int term;
         private final InternalLogEntry entry;
 
@@ -37,13 +37,13 @@ public class RaftNode {
     private int currentTerm = 0;
     private String votedFor = null;
     private final List<RaftLogEntry> log = new ArrayList<>();
+    private final LeaderElectionService leaderElectionService;
 
     // Volatile state
     private int commitIndex = 0;
     private int lastApplied = 0;
 
-    private final Set<String> receivedVotes = new HashSet<>();
-
+    final Set<String> receivedVotes = new HashSet<>();
     private final Map<String, Integer> nextIndex = new ConcurrentHashMap<>();
     private final Map<String, Integer> matchIndex = new ConcurrentHashMap<>();
 
@@ -55,22 +55,45 @@ public class RaftNode {
     private ScheduledFuture<?> electionTimeoutTask;
     private final Random random = new Random();
     private final AtomicBoolean electionInProgress = new AtomicBoolean(false);
-
     private final Set<String> partitionedPeers = new HashSet<>();
-    private final RaftGrpcClient raftGrpcClient;
 
-    public RaftNode(String nodeId, List<String> peers) {
+    final RaftGrpcClient raftGrpcClient;
+
+    public RaftNode(String nodeId, List<String> peers, LeaderElectionService leaderElectionService) {
         this.nodeId = nodeId;
         this.peers = peers;
         this.raftGrpcClient = new RaftGrpcClient("localhost", 50051);
+        this.leaderElectionService = leaderElectionService;
         resetElectionTimeout();
     }
 
-    // ------------------- NEW METHOD -------------------
-    public synchronized int getLastLogIndex() {
-        return log.isEmpty() ? 0 : log.size() - 1;
+    public synchronized void onRoleTransition(Role newRole) {
+        if (this.role != newRole) {
+            System.out.println(nodeId + " transitioning to " + newRole);
+            this.role = newRole;
+
+            if (newRole == Role.LEADER) {
+                sendHeartbeats();
+                resetElectionTimeout();
+            } else if (newRole == Role.CANDIDATE) {
+                startElection();
+            } else if (newRole == Role.FOLLOWER) {
+                this.votedFor = null;
+            }
+        }
     }
-    // --------------------------------------------------
+
+    public synchronized List<RaftLogEntry> getLog() {
+        return new ArrayList<>(log);
+    }
+
+    public synchronized int getLastLogIndex() {
+        return log.isEmpty() ? -1 : log.size() - 1;
+    }
+
+    public synchronized int getLastLogTerm() {
+        return log.isEmpty() ? 0 : log.get(getLastLogIndex()).getTerm();
+    }
 
     public int getNextLogIndex() {
         return log.size();
@@ -153,11 +176,9 @@ public class RaftNode {
         this.currentTerm = term;
         this.votedFor = null;
         electionInProgress.set(false);
-
         if (electionTimeoutTask != null) {
             electionTimeoutTask.cancel(false);
         }
-
         resetElectionTimeout();
         System.out.println(nodeId + " became FOLLOWER in term " + term);
     }
@@ -173,7 +194,9 @@ public class RaftNode {
     }
 
     public synchronized void becomeLeader() {
-        this.role = Role.LEADER;
+        if (this.role != Role.LEADER) {
+            this.role = Role.LEADER;
+        }
         electionInProgress.set(false);
         System.out.println(nodeId + " became LEADER for term " + currentTerm);
         for (String peer : peers) {
@@ -185,11 +208,9 @@ public class RaftNode {
 
     private void resetElectionTimeout() {
         if (role == Role.LEADER) return;
-
         if (electionTimeoutTask != null) {
             electionTimeoutTask.cancel(false);
         }
-
         int timeout = 150 + random.nextInt(150);
         electionTimeoutTask = scheduler.schedule(this::onElectionTimeout, timeout, TimeUnit.MILLISECONDS);
     }
@@ -200,49 +221,16 @@ public class RaftNode {
         }
     }
 
-    private void startElection() {
-        currentTerm++;
-        role = Role.CANDIDATE;
-        votedFor = nodeId;
-
-        receivedVotes.clear();
-        receivedVotes.add(nodeId);
-
-        System.out.println(nodeId + " is requesting votes for term " + currentTerm);
-
-        for (String peerId : peers) {
-            RequestVoteRequest requestVoteRequest = RequestVoteRequest.newBuilder()
-                    .setTerm(currentTerm)
-                    .setCandidateId(nodeId)
-                    .setLastLogIndex(getLastLogIndex())
-                    .setLastLogTerm(log.isEmpty() ? 0 : log.get(log.size() - 1).getTerm())
-                    .build();
-
-            raftGrpcClient.sendRequestVote(requestVoteRequest, new StreamObserver<RequestVoteResponse>() {
-                @Override
-                public void onNext(RequestVoteResponse value) {
-                    if (value.getVoteGranted()) {
-                        System.out.println(nodeId + " received vote from " + peerId);
-                        receivedVotes.add(peerId);
-                    }
-                }
-
-                @Override
-                public void onError(Throwable t) {
-                    System.out.println("Error while requesting vote from " + peerId + ": " + t.getMessage());
-                }
-
-                @Override
-                public void onCompleted() {
-                    System.out.println("Completed RequestVote RPC to " + peerId);
-                }
-            });
-        }
+    public synchronized void startElection() {
+        leaderElectionService.startElection();
     }
 
     public synchronized void receiveVoteRequest(String candidateId, int term) {
         if (term > currentTerm) {
             becomeFollower(term);
+        }
+
+        if (votedFor == null || votedFor.equals(candidateId)) {
             votedFor = candidateId;
         }
     }
@@ -265,16 +253,17 @@ public class RaftNode {
                 System.out.println(nodeId + " cannot send heartbeat to " + peer + " due to partition");
             } else {
                 successfulHeartbeats++;
+                System.out.println(nodeId + " successfully sent heartbeat to " + peer);
             }
         }
 
         int totalNodes = peers.size() + 1;
         int majority = (totalNodes / 2) + 1;
 
-        if ((successfulHeartbeats + 1) >= majority) {
+        if (successfulHeartbeats >= majority) {
             System.out.println(nodeId + " is still the leader.");
         } else {
-            System.out.println(nodeId + " lost majority, becoming candidate.");
+            System.out.println(nodeId + " lost majority, transitioning to candidate.");
             becomeCandidate();
         }
     }
@@ -308,5 +297,71 @@ public class RaftNode {
             electionTimeoutTask.cancel(false);
         }
         scheduler.shutdownNow();
+    }
+
+    public void sendRequestVoteRPC(String peerId) {
+        int lastLogIndex = getLastLogIndex();
+        int lastLogTerm = lastLogIndex >= 0 ? log.get(lastLogIndex).getTerm() : 0;
+
+        RequestVoteRequest request = RequestVoteRequest.newBuilder()
+                .setTerm(currentTerm)
+                .setCandidateId(nodeId)
+                .setLastLogIndex(lastLogIndex)
+                .setLastLogTerm(lastLogTerm)
+                .build();
+
+        raftGrpcClient.sendRequestVote(peerId, request, new StreamObserver<>() {
+            @Override
+            public void onNext(RequestVoteResponse response) {
+                synchronized (RaftNode.this) {
+                    if (response.getTerm() > currentTerm) {
+                        becomeFollower(response.getTerm());
+                    }
+
+                    if (role == Role.CANDIDATE && response.getVoteGranted()) {
+                        receivedVotes.add(peerId);
+                        if (receivedVotes.size() + 1 > (peers.size() + 1) / 2) {
+                            becomeLeader();
+                        }
+                    }
+                }
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                System.err.println("Vote RPC failed to " + peerId + ": " + t.getMessage());
+            }
+
+            @Override
+            public void onCompleted() {}
+        });
+    }
+
+    public void handleRequestVote(RequestVoteRequest request, StreamObserver<RequestVoteResponse> responseObserver) {
+        synchronized (this) {
+            boolean voteGranted = false;
+
+            if (request.getTerm() > currentTerm) {
+                becomeFollower(request.getTerm());
+            }
+
+            boolean upToDate = request.getLastLogTerm() > getLastLogTerm() ||
+                    (request.getLastLogTerm() == getLastLogTerm() && request.getLastLogIndex() >= getLastLogIndex());
+
+            if (request.getTerm() >= currentTerm &&
+                    (votedFor == null || votedFor.equals(request.getCandidateId())) &&
+                    upToDate) {
+                voteGranted = true;
+                votedFor = request.getCandidateId();
+            }
+
+            RequestVoteResponse response = RequestVoteResponse.newBuilder()
+                    .setTerm(currentTerm)
+                    .setVoteGranted(voteGranted)
+                    .build();
+
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        }
     }
 }

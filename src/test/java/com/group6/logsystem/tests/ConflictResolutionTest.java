@@ -26,7 +26,14 @@ class ConflictResolutionTest {
 
         // Force node1 to become leader with stale log
         staleLeader.becomeLeader();
-        InternalLogEntry staleEntry = new InternalLogEntry("node1", "old_log_entry", System.currentTimeMillis(), 1);
+        InternalLogEntry staleEntry = new InternalLogEntry(
+                staleLeader.getCurrentTerm(),  // term
+                "node1",                        // nodeId
+                "old_log_entry",                // message
+                System.currentTimeMillis(),     // timestamp
+                1                               // index
+        );
+
         staleLeader.appendLogEntry(staleEntry);
 
         // Simulate partition (no replication to node2)
@@ -36,7 +43,14 @@ class ConflictResolutionTest {
         newLeader.becomeFollower(2); // Update term
         newLeader.becomeCandidate();
         newLeader.becomeLeader();
-        InternalLogEntry correctEntry = new InternalLogEntry("node2", "correct_log_entry", System.currentTimeMillis(), 2);
+        InternalLogEntry correctEntry = new InternalLogEntry(
+                newLeader.getCurrentTerm(),    // term
+                "node2",                       // nodeId
+                "correct_log_entry",          // message
+                System.currentTimeMillis(),   // timestamp
+                2                             // index
+        );
+
         newLeader.appendLogEntry(correctEntry);
     }
 
