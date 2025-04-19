@@ -18,7 +18,7 @@ public class TimeSyncManager {
         long updatedTimestamp = logicalClock.receive(logEntry.getTimestamp());
 
         // Then, correct the log's timestamp if necessary
-        logEntry.setTimestamp(updatedTimestamp);
+        //logEntry.setTimestamp(updatedTimestamp);
         timestampCorrector.bufferLog(logEntry);
 
         return updatedTimestamp;
