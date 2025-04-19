@@ -119,7 +119,7 @@ public class Node {
         long updatedTimestamp = logicalClock.receive(logEntry.getTimestamp());
 
         // Adjust log entry timestamp if necessary
-        logEntry.setTimestamp(updatedTimestamp);
+        //logEntry.setTimestamp(updatedTimestamp);
 
         // Buffer and reorder logs
         timestampCorrector.bufferLog(logEntry);
