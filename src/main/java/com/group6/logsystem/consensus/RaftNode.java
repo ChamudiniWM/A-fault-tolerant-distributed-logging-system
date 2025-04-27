@@ -1,6 +1,5 @@
 package com.group6.logsystem.consensus;
 
-import com.group6.logsystem.grpc.RaftGrpcClient;
 import com.group6.logsystem.grpc.*;
 import com.group6.logsystem.models.InternalLogEntry;
 import io.grpc.stub.StreamObserver;
@@ -321,7 +320,7 @@ public class RaftNode {
         }
     }
 
-    private boolean isPartitioned(String peer) {
+    public boolean isPartitioned(String peer) {
         return partitionedPeers.contains(peer);
     }
 
@@ -338,5 +337,24 @@ public class RaftNode {
             electionTimeoutTask.cancel(false);
         }
         scheduler.shutdownNow();
+    }
+
+    public synchronized CompletableFuture<Boolean> applyLog(InternalLogEntry entry) {
+        if (entry == null) {
+            return CompletableFuture.completedFuture(false);
+        }
+        
+        try {
+            if (!seenLogIds.contains(entry.getLogId())) {
+                seenLogIds.add(entry.getLogId());
+                log.add(new RaftLogEntry(currentTerm, entry));
+                nodeIdIndex.computeIfAbsent(entry.getNodeId(), k -> new ArrayList<>()).add(entry);
+                timestampIndex.computeIfAbsent(entry.getTimestamp(), k -> new ArrayList<>()).add(entry);
+                return CompletableFuture.completedFuture(true);
+            }
+            return CompletableFuture.completedFuture(false);
+        } catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 }

@@ -21,6 +21,7 @@ public class InternalLogEntry {
         this.term = term;
     }
 
+
     public String getLogId() {
         return logId;
     }
