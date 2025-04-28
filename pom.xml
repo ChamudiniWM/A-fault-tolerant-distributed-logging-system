@@ -67,8 +67,9 @@
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
-            <version>4.28.2</version> <!-- Make sure to use a version > 3.0 -->
+            <version>3.24.2</version>
         </dependency>
+
 
         <!-- RocksDB -->
         <dependency>
@@ -176,29 +177,35 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <source>17</source>
+                    <target>17</target>
+                    <compileSourceRoots>
+                        <compileSourceRoot>${project.build.directory}/generated-sources/protobuf/java</compileSourceRoot>
+                        <compileSourceRoot>${project.build.directory}/generated-sources/protobuf/grpc-java</compileSourceRoot>
+                    </compileSourceRoots>
                 </configuration>
             </plugin>
 
-            <!-- Protobuf Maven Plugin -->
+            <!-- Protobuf Maven Plugin for generating Java code from .proto files -->
             <plugin>
                 <groupId>org.xolstice.maven.plugins</groupId>
                 <artifactId>protobuf-maven-plugin</artifactId>
                 <version>0.6.1</version>
-                <configuration>
-                    <!--suppress UnresolvedMavenProperty -->
-                    <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
-                    <pluginId>grpc-java</pluginId>
-                    <!--suppress UnresolvedMavenProperty -->
-                    <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
-                </configuration>
                 <executions>
                     <execution>
                         <goals>
                             <goal>compile</goal>
                             <goal>compile-custom</goal>
                         </goals>
+                        <configuration>
+                            <pluginId>grpc-java</pluginId>
+                            <!--suppress UnresolvedMavenProperty -->
+                            <pluginArtifact>io.grpc:protoc-gen-grpc-java:1.38.0:exe:${os.detected.classifier}</pluginArtifact>
+                            <!--suppress UnresolvedMavenProperty -->
+                            <protocArtifact>com.google.protobuf:protoc:3.14.0:exe:${os.detected.classifier}</protocArtifact>
+                            <outputDirectory>${project.build.directory}/generated-sources/protobuf</outputDirectory>
+                            <clearOutputDirectory>false</clearOutputDirectory>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
