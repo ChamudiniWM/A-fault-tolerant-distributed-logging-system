@@ -1,14 +1,36 @@
 package com.dls.common;
 
 import com.dls.raft.rpc.LogEntry;  // gRPC-generated LogEntry
+import java.util.List;
 
 public class LocalLogEntry {
+    private int index;             // <-- Added index
     private int term;
     private String command;
+    private long timestamp;
+    private String id;
+    private String data;
+    private String metadata;
 
-    public LocalLogEntry(int term, String command) {
+    public LocalLogEntry(int index, int term, String command, long timestamp, String id) {
+        this.index = index;
         this.term = term;
         this.command = command;
+        this.timestamp = timestamp;
+        this.id = id;
+    }
+
+    // Convenience constructor if no ID provided
+    public LocalLogEntry(int index, int term, String command, long timestamp) {
+        this(index, term, command, timestamp, null);
+    }
+
+    public int getIndex() {
+        return index;
+    }
+
+    public void setIndex(int index) {
+        this.index = index;
     }
 
     public int getTerm() {
@@ -27,21 +49,91 @@ public class LocalLogEntry {
         this.command = command;
     }
 
+    public long getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getData() {
+        return data;
+    }
+
+    public void setData(String data) {
+        this.data = data;
+    }
+
+    public String getMetadata() {
+        return metadata;
+    }
+
+    public void setMetadata(String metadata) {
+        this.metadata = metadata;
+    }
+
     @Override
     public String toString() {
-        return "LocalLogEntry{term=" + term + ", command='" + command + "'}";
+        return "LocalLogEntry{" +
+                "index=" + index +
+                ", term=" + term +
+                ", command='" + command + '\'' +
+                ", timestamp=" + timestamp +
+                (id != null ? ", id='" + id + '\'' : "") +
+                '}';
     }
 
     // Convert from gRPC LogEntry to Java LocalLogEntry
     public static LocalLogEntry fromGrpcLogEntry(LogEntry grpcLogEntry) {
-        return new LocalLogEntry(grpcLogEntry.getTerm(), grpcLogEntry.getCommand());
+        LocalLogEntry entry = new LocalLogEntry(
+                grpcLogEntry.getIndex(),
+                grpcLogEntry.getTerm(),
+                grpcLogEntry.getCommand(),
+                grpcLogEntry.getTimestamp(),
+                grpcLogEntry.getId()
+        );
+
+        entry.setData(grpcLogEntry.getData());
+        entry.setMetadata(grpcLogEntry.getMetadata());
+
+        return entry;
+    }
+
+    public static List<LocalLogEntry> fromGrpcLogEntryList(List<LogEntry> grpcEntries) {
+        List<LocalLogEntry> localEntries = new java.util.ArrayList<>();
+        for (LogEntry entry : grpcEntries) {
+            localEntries.add(fromGrpcLogEntry(entry));
+        }
+        return localEntries;
     }
 
     // Convert from Java LocalLogEntry to gRPC LogEntry
     public LogEntry toGrpcLogEntry() {
-        return LogEntry.newBuilder()
+        LogEntry.Builder builder = LogEntry.newBuilder()
+                .setIndex(this.index)
                 .setTerm(this.term)
                 .setCommand(this.command)
-                .build();
+                .setTimestamp(this.timestamp);
+
+        if (this.id != null) {
+            builder.setId(this.id);
+        }
+        if (this.data != null) {
+            builder.setData(this.data);
+        }
+        if (this.metadata != null) {
+            builder.setMetadata(this.metadata);
+        }
+
+        return builder.build();
     }
 }

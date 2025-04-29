@@ -6,10 +6,16 @@ option java_multiple_files = true;
 option java_package = "com.dls.raft.rpc";
 option java_outer_classname = "RaftProto";
 
+import "google/protobuf/empty.proto";
+
 // Service
 service Raft {
   rpc AppendEntries(AppendEntriesRequest) returns (AppendEntriesResponse);
   rpc RequestVote(RequestVoteRequest) returns (RequestVoteResponse);
+}
+
+service LoggingService {
+  rpc Log(LogMessage) returns (google.protobuf.Empty);
 }
 
 // Messages for AppendEntries RPC
@@ -45,4 +51,14 @@ message LogEntry {
   int32 index = 1;
   int32 term = 2;
   string command = 3;
+  int64 timestamp = 4;
+  string id = 5;
+  string data = 6;
+  string metadata = 7;
 }
+
+message LogMessage {
+  string nodeId = 1;
+  string message = 2;
+}
+

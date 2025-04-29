@@ -47,8 +47,12 @@ public class RaftLog {
         if (newCommitIndex > commitIndex) {
             commitIndex = newCommitIndex;
         }
-        // No else print needed: leaderCommit might naturally be ahead of current logs early on
     }
+
+    public synchronized void appendEntry(LocalLogEntry entry) {
+        logEntries.add(entry.toGrpcLogEntry());
+    }
+
 
     public synchronized int getCommitIndex() {
         return commitIndex;
@@ -63,12 +67,21 @@ public class RaftLog {
     }
 
     public synchronized List<LogEntry> getUncommittedEntries() {
-        // If no entries committed yet, uncommitted entries are all entries
         int start = commitIndex + 1;
         if (start < 0) {
             start = 0;
         }
         return new ArrayList<>(logEntries.subList(start, logEntries.size()));
+    }
+
+    public synchronized List<LogEntry> getEntriesSince(int fromIndex) {
+        if (fromIndex < 0) {
+            fromIndex = 0;
+        }
+        if (fromIndex >= logEntries.size()) {
+            return new ArrayList<>();
+        }
+        return new ArrayList<>(logEntries.subList(fromIndex, logEntries.size()));
     }
 
     public synchronized List<LogEntry> getLogEntries() {

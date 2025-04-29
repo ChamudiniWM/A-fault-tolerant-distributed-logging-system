@@ -1,9 +1,17 @@
 package com.dls.raft;
 
 import com.dls.common.NodeInfo;
+import com.dls.common.RejectionTracker;
 import com.dls.raft.rpc.AppendEntriesRequest;
 import java.util.List;
 import java.util.concurrent.*;
+
+import com.dls.raft.rpc.RaftGrpc;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class RaftNode {
 
@@ -27,6 +35,10 @@ public class RaftNode {
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
+    // Field to cache gRPC stubs
+    private final Map<NodeInfo, RaftGrpc.RaftStub> peerStubs = new ConcurrentHashMap<>();
+
+
     public RaftNode(NodeInfo self, List<NodeInfo> peers) {
         this.self = self;
         this.peers = peers;
@@ -38,8 +50,10 @@ public class RaftNode {
         this.leaderElection = new LeaderElection(this);
         this.consensusModule = new ConsensusModule(this);
 
-        System.out.println("RaftNode initialized for node: " + self.getNodeId() + " in state: " + state + " with term: " + currentTerm);
+        createGrpcStubs(); // Create gRPC stubs at startup
 
+        System.out.println("RaftNode initialized for node: " + self.getNodeId() + " in state: " + state + " with term: " + currentTerm);
+        RejectionTracker.startLogging();
         startElectionTimer();
     }
 
@@ -139,6 +153,19 @@ public class RaftNode {
         }
     }
 
+    // Method to create stubs
+    private void createGrpcStubs() {
+        for (NodeInfo peer : peers) {
+            if (!peer.equals(self)) {
+                ManagedChannel channel = ManagedChannelBuilder.forAddress(peer.getHost(), peer.getPort())
+                        .usePlaintext()
+                        .build();
+                RaftGrpc.RaftStub stub = RaftGrpc.newStub(channel);
+                peerStubs.put(peer, stub);
+            }
+        }
+    }
+
     private int randomElectionTimeout() {
         return ELECTION_TIMEOUT_MIN + (int) (Math.random() * (ELECTION_TIMEOUT_MAX - ELECTION_TIMEOUT_MIN));
     }
@@ -166,6 +193,10 @@ public class RaftNode {
 
     public RaftLog getRaftLog() {
         return raftLog;
+    }
+
+    public Map<NodeInfo, RaftGrpc.RaftStub> getPeerStubs() {
+        return peerStubs;
     }
 
     public synchronized void setCurrentTerm(int term) {
