@@ -14,6 +14,7 @@ import io.grpc.stub.StreamObserver;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class ConsensusModule {
 
@@ -35,7 +36,12 @@ public class ConsensusModule {
             int prevLogIndex = nextIndex - 1;
             int prevLogTerm = raftNode.getTermAtIndex(prevLogIndex);
 
-            List<LogEntry> entriesToSend = raftNode.getRaftLog().getEntriesSince(nextIndex);  // Entries from nextIndex onward
+            // Optional batching: send max 5 entries
+            List<LogEntry> entriesToSend = raftNode.getRaftLog()
+                    .getEntriesSince(nextIndex)
+                    .stream()
+                    .limit(5)  // send last 5 entries max
+                    .collect(Collectors.toList());
 
             AppendEntriesRequest request = AppendEntriesRequest.newBuilder()
                     .setLeaderId(raftNode.getSelf().getNodeId())
@@ -72,6 +78,7 @@ public class ConsensusModule {
     }
 
 
+
     public void handleNewLogEntry(LogEntry entry) {
         LocalLogEntry localEntry = LocalLogEntry.fromGrpcLogEntry(entry);
         raftNode.getRaftLog().appendEntry(localEntry, raftNode.getCurrentTerm());
@@ -106,7 +113,7 @@ public class ConsensusModule {
                     if (response.getSuccess()) {
                         // Update matchIndex for the peer
                         raftNode.advanceMatchIndex(peer.getNodeId(), nextIndex + entriesToSend.size() - 1);
-                        System.out.println("✅ Log replicated to " + peer.getNodeId());
+                        System.out.println("Log replicated to " + peer.getNodeId());
                     } else {
                         // Decrement nextIndex for the peer
                         raftNode.decrementNextIndex(peer.getNodeId());

@@ -2,6 +2,11 @@ package com.dls.raft;
 
 import com.dls.common.LocalLogEntry;
 import com.dls.raft.rpc.LogEntry;
+
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -11,14 +16,29 @@ public class RaftLog {
 
     private final List<LogEntry> logEntries;
     private int commitIndex;
+    private final String nodeId;
+    private final Path logFile;
+    private static final String LOG_DIR = "raft_logs";
     //private final Map<String, Integer> nextIndex = new HashMap<>();  // Maps peerId to nextIndex
    // private final Map<String, Integer> matchIndex = new HashMap<>(); // Maps peerId to matchIndex
 
 
-    public RaftLog() {
+    public RaftLog(String nodeId) {
+        this.nodeId = nodeId;
         this.logEntries = new ArrayList<>();
         this.commitIndex = -1; // Start with -1 meaning "no committed entries yet"
+        // Create logs directory if it doesn't exist
+        try {
+            Files.createDirectories(Paths.get(LOG_DIR));
+        } catch (IOException e) {
+            System.err.println("Failed to create logs directory: " + e.getMessage());
+        }
+        this.logFile = Paths.get(LOG_DIR, "raft_log_" + nodeId + ".dat");
+        loadFromDisk();
+
     }
+
+
 
     public synchronized int getLastLogIndex() {
         return logEntries.size() - 1;
@@ -49,6 +69,7 @@ public class RaftLog {
             LogEntry grpcEntry = entry.toGrpcLogEntry();
             logEntries.add(grpcEntry);
         }
+        saveToDisk();
     }
 
 
@@ -66,6 +87,7 @@ public class RaftLog {
         entry.setTerm(term);
         LogEntry grpcEntry = entry.toGrpcLogEntry();
         logEntries.add(grpcEntry);
+        saveToDisk();
     }
 
 
@@ -104,6 +126,45 @@ public class RaftLog {
             return new ArrayList<>();
         }
         return new ArrayList<>(logEntries.subList(fromIndex, logEntries.size()));
+    }
+
+    private synchronized void loadFromDisk() {
+        if (!Files.exists(logFile)) {
+            return;
+        }
+
+        try (ObjectInputStream ois = new ObjectInputStream(
+                new FileInputStream(logFile.toFile()))) {
+
+            // Read commit index
+            commitIndex = ois.readInt();
+
+            // Read log entries
+            int size = ois.readInt();
+            for (int i = 0; i < size; i++) {
+                LogEntry entry = (LogEntry) ois.readObject();
+                logEntries.add(entry);
+            }
+
+            System.out.println("Loaded " + size + " log entries from disk for node " + nodeId);
+        } catch (IOException | ClassNotFoundException e) {
+            System.err.println("Error loading log from disk: " + e.getMessage());
+        }
+    }
+
+    private synchronized void saveToDisk() {
+        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(logFile.toFile()))) {
+            out.writeInt(commitIndex);
+            out.writeInt(logEntries.size());
+            for (LogEntry entry : logEntries) {
+                out.writeObject(entry);
+            }
+            out.flush();
+            System.out.println("Saved " + logEntries.size() + " log entries to disk for node " + nodeId + ". Last commit index: " + commitIndex);
+        } catch (IOException e) {
+            System.err.println("Failed to save log to disk: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     public synchronized List<LogEntry> getLogEntries() {

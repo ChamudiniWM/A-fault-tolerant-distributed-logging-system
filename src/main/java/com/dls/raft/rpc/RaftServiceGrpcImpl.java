@@ -3,7 +3,6 @@ package com.dls.raft.rpc;
 import io.grpc.stub.StreamObserver;
 import com.dls.raft.ConsensusModule;
 import com.dls.raft.LeaderElection;
-import com.dls.raft.rpc.LogEntry; // Import your LogEntry DTO
 import com.google.protobuf.Empty;
 
 public class RaftServiceGrpcImpl extends RaftGrpc.RaftImplBase {

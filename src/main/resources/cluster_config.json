@@ -13,5 +13,20 @@
     "nodeId": "node3",
     "host": "localhost",
     "port": 50053
+  },
+  {
+    "nodeId": "node4",
+    "host": "localhost",
+    "port": 50054
+  },
+  {
+    "nodeId": "node5",
+    "host": "localhost",
+    "port": 50055
+  },
+  {
+    "nodeId": "node6",
+    "host": "localhost",
+    "port": 50057
   }
 ]
