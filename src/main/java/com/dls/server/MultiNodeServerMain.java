@@ -8,6 +8,12 @@ import com.dls.raft.rpc.RaftServiceGrpcImpl;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 
+import com.dls.raft.rpc.LogMessage;
+import com.dls.raft.rpc.LoggingServiceGrpc;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -64,6 +70,20 @@ public class MultiNodeServerMain {
             server.start();
             System.out.println("Node " + selfNodeInfo.getNodeId() + " started successfully!");
 
+            // Create gRPC stub for LoggingService (to send logs to LoggingServer at port 50056)
+            ManagedChannel loggingChannel = ManagedChannelBuilder.forAddress("localhost", 50056)
+                    .usePlaintext()
+                    .build();
+
+            LoggingServiceGrpc.LoggingServiceBlockingStub logStub = LoggingServiceGrpc.newBlockingStub(loggingChannel);
+
+            // Send a test log to LoggingServer
+            logStub.log(LogMessage.newBuilder()
+                    .setNodeId(selfNodeInfo.getNodeId())
+                    .setMessage("✅ Node " + selfNodeInfo.getNodeId() + " started successfully and connected to LoggingServer")
+                    .build());
+
+
             // Debugging: Log shutdown hook
             System.out.println("Adding shutdown hook for node " + selfNodeInfo.getNodeId());
 
@@ -71,6 +91,7 @@ public class MultiNodeServerMain {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 System.err.println("Shutting down node " + selfNodeInfo.getNodeId());
                 server.shutdown();
+                loggingChannel.shutdown();
             }));
 
             // Wait for the server to terminate (blocking)

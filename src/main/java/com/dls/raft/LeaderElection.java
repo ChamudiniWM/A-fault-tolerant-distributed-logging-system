@@ -10,6 +10,12 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
 
+import com.dls.raft.rpc.LoggingServiceGrpc;
+import com.dls.raft.rpc.LogMessage;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+
+
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -33,6 +39,8 @@ public class LeaderElection {
         raftNode.resetElectionTimer();
         System.out.println("Starting election for term " + raftNode.getCurrentTerm());
         voteCount.set(1); // Self-vote
+        logToLoggingServer("📢 Starting election for term " + raftNode.getCurrentTerm());
+
 
         List<NodeInfo> peers = raftNode.getPeers();
         for (NodeInfo peer : peers) {
@@ -52,26 +60,31 @@ public class LeaderElection {
     }
 
     public synchronized void processVoteResponse(RequestVoteResponse response) {
-        // Before processing vote, confirm node is still a Candidate
-        if (raftNode.getState() != RaftState.CANDIDATE) {
-            System.out.println("Ignoring vote because node is no longer candidate.");
-            return;
-        }
+        synchronized (this) {
+            // Before processing vote, confirm node is still a Candidate
+            if (raftNode.getState() != RaftState.CANDIDATE) {
+                System.out.println("Ignoring vote because node is no longer candidate.");
+                return;
+            }
 
-        if (response.getTerm() > raftNode.getCurrentTerm()) {
-            raftNode.becomeFollower(response.getTerm());
-            raftNode.resetElectionTimer();
-            return;
-        }
+            if (response.getTerm() > raftNode.getCurrentTerm()) {
+                raftNode.becomeFollower(response.getTerm());
+                raftNode.resetElectionTimer();
+                return;
+            }
 
-        if (response.getVoteGranted()) {
-            int votes = voteCount.incrementAndGet();
-            System.out.println("Node " + raftNode.getSelf().getNodeId() + " received a vote, current votes: " + votes);
+            if (response.getVoteGranted()) {
+                int votes = voteCount.incrementAndGet();
+                System.out.println("Node " + raftNode.getSelf().getNodeId() + " received a vote, current votes: " + votes);
+                logToLoggingServer("🗳️ Received vote from peer. Total votes: " + votes);
 
-            // Check again if still Candidate before becoming Leader
-            if (votes > (raftNode.getPeers().size() + 1) / 2 && raftNode.getState() == RaftState.CANDIDATE) {
-                raftNode.becomeLeader();
-                System.out.println("Node " + raftNode.getSelf().getNodeId() + " became Leader for term " + raftNode.getCurrentTerm());
+
+                // Check again if still Candidate before becoming Leader
+                if (votes > (raftNode.getPeers().size() + 1) / 2 && raftNode.getState() == RaftState.CANDIDATE) {
+                    raftNode.becomeLeader();
+                    System.out.println("Node " + raftNode.getSelf().getNodeId() + " became Leader for term " + raftNode.getCurrentTerm());
+                    logToLoggingServer("👑 Became Leader for term " + raftNode.getCurrentTerm());
+                }
             }
         }
     }
@@ -102,6 +115,31 @@ public class LeaderElection {
         }
     }
 
+    private void logToLoggingServer(String message) {
+        ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 50056)
+                .usePlaintext()
+                .build();
+
+        LoggingServiceGrpc.LoggingServiceBlockingStub stub = LoggingServiceGrpc.newBlockingStub(channel);
+
+        try {
+            stub.log(LogMessage.newBuilder()
+                    .setNodeId(raftNode.getSelf().getNodeId())
+                    .setMessage(message)
+                    .build());
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send log to LoggingServer: " + e.getMessage());
+        } finally {
+            new Thread(() -> {
+                try {
+                    Thread.sleep(200);
+                    channel.shutdown();
+                } catch (InterruptedException ignored) {}
+            }).start();
+        }
+    }
+
+
     public RequestVoteResponse processVoteRequest(RequestVoteRequest request) {
         System.out.println("Processing vote request for term " + request.getTerm() + " from " + request.getCandidateId());
 
@@ -109,6 +147,7 @@ public class LeaderElection {
 
         if (request.getTerm() < raftNode.getCurrentTerm()) {
             System.out.println("Rejecting vote from " + request.getCandidateId() + " for stale term " + request.getTerm());
+            logToLoggingServer("❌ Rejected vote from " + request.getCandidateId() + " due to stale term " + request.getTerm());
             voteGranted = false;
         } else {
             // If request term is greater, update our term and become follower
@@ -119,11 +158,13 @@ public class LeaderElection {
             if ((raftNode.getVotedFor() == null || raftNode.getVotedFor().equals(request.getCandidateId()))
                     && raftNode.getRaftLog().isUpToDate(request.getLastLogIndex(), request.getLastLogTerm())) {
                 System.out.println("Granting vote to " + request.getCandidateId() + " for term " + request.getTerm());
+                logToLoggingServer("✅ Granted vote to " + request.getCandidateId() + " for term " + request.getTerm());
                 raftNode.setVotedFor(request.getCandidateId());
                 raftNode.resetElectionTimer();
                 voteGranted = true;
             } else {
                 System.out.println("Rejecting vote from " + request.getCandidateId() + " due to log mismatch or already voted for another.");
+                logToLoggingServer("❌ Rejected vote from " + request.getCandidateId() + " due to log mismatch or already voted.");
             }
         }
 

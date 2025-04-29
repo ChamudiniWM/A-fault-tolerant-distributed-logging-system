@@ -49,7 +49,7 @@ public class ConsensusModule {
                 public void onNext(AppendEntriesResponse response) {
                     if (!response.getSuccess()) {
                         System.out.println("AppendEntries rejected by " + peer.getNodeId());
-                    }
+                    } else System.out.println("AppendEntries succeeded for " + peer.getNodeId());
                 }
 
                 @Override
@@ -88,30 +88,45 @@ public class ConsensusModule {
 
             raftNode.resetElectionTimer();
 
-            if (!request.getEntriesList().isEmpty()) {
-                if (raftNode.getRaftLog().matchLog(request.getPrevLogIndex(), request.getPrevLogTerm())) {
-                    success = true;
-
-                    raftNode.getRaftLog().appendEntries(
-                            LocalLogEntry.fromGrpcLogEntryList(request.getEntriesList())
-                    );
-
-                    raftNode.getRaftLog().setCommitIndex(
-                            Math.min(request.getLeaderCommit(), raftNode.getRaftLog().getLastLogIndex())
-                    );
-
-                    long endTime = System.nanoTime();
-                    long latencyMicros = TimeUnit.NANOSECONDS.toMicros(endTime - startTime);
-                    PerformanceLogger.logLatency(latencyMicros);
-                    System.out.println("[Performance] AppendEntries processed. Latency: " + latencyMicros + " µs");
-                }
-            } else {
-                RejectionTracker.increment();
+            if (request.getTerm() < raftNode.getCurrentTerm()) {
                 success = false;
+                RejectionTracker.increment();
+            } else {
+                if (request.getTerm() > raftNode.getCurrentTerm()) {
+                    raftNode.becomeFollower(request.getTerm());
+                }
+
+                raftNode.resetElectionTimer();
+
+                if (request.getEntriesList().isEmpty()) {
+                    // Heartbeat or no-op AppendEntries
+                    success = raftNode.getRaftLog().matchLog(request.getPrevLogIndex(), request.getPrevLogTerm());
+                } else {
+                    // Append new entries
+                    if (raftNode.getRaftLog().matchLog(request.getPrevLogIndex(), request.getPrevLogTerm())) {
+                        success = true;
+
+                        raftNode.getRaftLog().appendEntries(
+                                LocalLogEntry.fromGrpcLogEntryList(request.getEntriesList())
+                        );
+
+                        raftNode.getRaftLog().setCommitIndex(
+                                Math.min(request.getLeaderCommit(), raftNode.getRaftLog().getLastLogIndex())
+                        );
+
+                        long endTime = System.nanoTime();
+                        long latencyMicros = TimeUnit.NANOSECONDS.toMicros(endTime - startTime);
+                        PerformanceLogger.logLatency(latencyMicros);
+                        System.out.println("[Performance] AppendEntries processed. Latency: " + latencyMicros + " µs");
+                    } else {
+                        success = false;
+                        RejectionTracker.increment();
+                    }
+                }
             }
         }
 
-        return AppendEntriesResponse.newBuilder()
+            return AppendEntriesResponse.newBuilder()
                 .setTerm(raftNode.getCurrentTerm())
                 .setSuccess(success)
                 .build();
