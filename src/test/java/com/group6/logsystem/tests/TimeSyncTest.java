@@ -16,21 +16,21 @@ public class TimeSyncTest {
         // Simulate out-of-order logs
         LogEntry log1 = LogEntry.newBuilder()
                 .setNodeId("Node-1")
-                .setMessage("First Event (late)")
+                .setMessage("First Event (early)")
                 .setTimestamp(clock.update(3000))
                 .setTerm(1)
                 .build();
 
         LogEntry log2 = LogEntry.newBuilder()
                 .setNodeId("Node-2")
-                .setMessage("Second Event (early)")
+                .setMessage("Second Event (normal)")
                 .setTimestamp(clock.update(1000))
                 .setTerm(1)
                 .build();
 
         LogEntry log3 = LogEntry.newBuilder()
                 .setNodeId("Node-3")
-                .setMessage("Third Event (normal)")
+                .setMessage("Third Event (late)")
                 .setTimestamp(clock.update(2000))
                 .setTerm(1)
                 .build();
