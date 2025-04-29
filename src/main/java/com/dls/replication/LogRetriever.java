@@ -25,7 +25,7 @@ public class LogRetriever {
         List<LocalLogEntry> correctedEntries = new ArrayList<>();
 
         for (LocalLogEntry entry : rawEntries) {
-            long correctedTimestamp = timestampCorrector.correct(entry.getTimestamp());
+            long correctedTimestamp = timestampCorrector.correct(entry.getId(), entry.getTimestamp());
 
             LocalLogEntry correctedEntry = new LocalLogEntry(
                     entry.getIndex(),

@@ -1,5 +1,6 @@
 package com.dls.raft;
 
+import com.dls.common.LocalLogEntry;
 import com.dls.common.NodeInfo;
 import com.dls.common.RejectionTracker;
 import com.dls.raft.rpc.AppendEntriesRequest;
@@ -26,6 +27,10 @@ public class RaftNode {
     private final LeaderElection leaderElection;
     private final ConsensusModule consensusModule;
 
+    private final Map<String, Integer> nextIndex = new HashMap<>();  // Maps peerId to nextIndex
+    private final Map<String, Integer> matchIndex = new HashMap<>(); // Maps peerId to matchIndex
+
+
     private ScheduledFuture<?> electionTimeoutTask;
     private ScheduledFuture<?> heartbeatTask;
 
@@ -51,6 +56,14 @@ public class RaftNode {
         this.consensusModule = new ConsensusModule(this);
 
         createGrpcStubs(); // Create gRPC stubs at startup
+
+        for (NodeInfo peer : peers) {
+            if (!peer.getNodeId().equals(self.getNodeId())) {
+                nextIndex.put(peer.getNodeId(), raftLog.getLastLogIndex() + 1);  // Set to the index after the last log entry
+                matchIndex.put(peer.getNodeId(), -1);  // Initially, no logs match (set to -1)
+            }
+        }
+
 
         System.out.println("RaftNode initialized for node: " + self.getNodeId() + " in state: " + state + " with term: " + currentTerm);
         RejectionTracker.startLogging();
@@ -103,6 +116,34 @@ public class RaftNode {
 
         consensusModule.processAppendEntries(request);
     }
+
+    public synchronized void appendEntryToLog(LocalLogEntry entry) {
+        // Append to local log
+        raftLog.appendEntry(entry, getCurrentTerm());
+
+
+        // Debug
+        System.out.println("Leader " + self.getNodeId() + " appended entry to log: " + entry);
+
+        // Replicate to followers
+        if (state == RaftState.LEADER) {
+            consensusModule.broadcastAppendEntries();  // This should send log entries to followers
+        }
+    }
+
+    // Method to advance matchIndex for a given peer
+    public synchronized void advanceMatchIndex(String peerId, int index) {
+        matchIndex.put(peerId, index);  // Set matchIndex for the peer to the new index
+        System.out.println("Advanced matchIndex for " + peerId + " to " + index);
+    }
+
+    // Method to decrement nextIndex for a given peer
+    public synchronized void decrementNextIndex(String peerId) {
+        nextIndex.put(peerId, nextIndex.get(peerId) - 1);  // Decrease the nextIndex for the peer
+        System.out.println("Decremented nextIndex for " + peerId);
+    }
+
+
 
     private synchronized void startElectionTimer() {
         cancelElectionTimer();
@@ -166,9 +207,17 @@ public class RaftNode {
         }
     }
 
+    public void shutdown() {
+        peerStubs.keySet().forEach(peer -> {
+            ((ManagedChannel) peerStubs.get(peer).getChannel()).shutdown();
+        });
+        scheduler.shutdown();
+    }
+
     private int randomElectionTimeout() {
         return ELECTION_TIMEOUT_MIN + (int) (Math.random() * (ELECTION_TIMEOUT_MAX - ELECTION_TIMEOUT_MIN));
     }
+
 
     // Getters and Setters
     public NodeInfo getSelf() {
@@ -212,4 +261,16 @@ public class RaftNode {
     public synchronized int getCommitIndex() {
         return raftLog.getCommitIndex();
     }
+
+    public int getNextIndexFor(String peerId) {
+        return nextIndex.getOrDefault(peerId, raftLog.getLastLogIndex() + 1); // Default is after the last log
+    }
+
+    public int getTermAtIndex(int index) {
+        if (index < 0 || index >= raftLog.getLogEntries().size()) {
+            return -1;  // Invalid index
+        }
+        return raftLog.getLogEntries().get(index).getTerm();
+    }
+
 }

@@ -58,7 +58,7 @@ public class AppendEntriesRPC {
                 .collect(Collectors.toList());
 
         // Append new entries
-        raftNode.getRaftLog().appendEntries(commonLogEntries);
+        raftNode.getRaftLog().appendEntries(commonLogEntries, raftNode.getCurrentTerm());
         System.out.println("Appended " + request.getEntriesCount() + " new entries");
 
         // Update the commit index if necessary

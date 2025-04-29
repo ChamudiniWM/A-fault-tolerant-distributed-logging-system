@@ -9,12 +9,13 @@ public class TimestampCorrector {
     }
 
     /**
-     * Corrects the given timestamp using the known clock offset.
+     * Corrects the timestamp from a specific node using its known clock skew.
      *
-     * @param originalTimestamp The original timestamp (local time).
-     * @return Corrected timestamp after applying clock offset.
+     * @param nodeId            ID of the node that generated the timestamp.
+     * @param originalTimestamp The original timestamp from that node.
+     * @return Corrected timestamp.
      */
-    public long correct(long originalTimestamp) {
-        return clockSkewHandler.correctTimestamp(originalTimestamp);
+    public long correct(String nodeId, long originalTimestamp) {
+        return clockSkewHandler.correctTimestamp(nodeId, originalTimestamp);
     }
 }

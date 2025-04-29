@@ -1,34 +1,41 @@
 package com.dls.timesync;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 public class ClockSkewHandler {
 
-    // This will store the clock offset detected during synchronization
-    private long clockOffsetMillis = 0L;
+    // Each node can have its own offset (e.g., node1 is -30ms, node2 is +50ms)
+    private final Map<String, Long> nodeClockOffsets = new ConcurrentHashMap<>();
 
     /**
-     * Sync with NTP server and update internal clock offset.
+     * Set the clock offset for a specific node.
+     *
+     * @param nodeId Node ID (e.g., "node1")
+     * @param offset Clock offset in milliseconds
      */
-    public void synchronizeClock() {
-        clockOffsetMillis = TimeSynchronizer.getClockOffset();
-        System.out.println("[ClockSkewHandler] Updated clock offset: " + clockOffsetMillis + " ms");
+    public void setClockOffset(String nodeId, long offset) {
+        nodeClockOffsets.put(nodeId, offset);
     }
 
     /**
-     * Adjust a local timestamp to be "corrected" by clock offset.
+     * Get the clock offset for a specific node.
      *
-     * @param localTimestamp Local timestamp in milliseconds.
-     * @return Corrected timestamp in milliseconds.
+     * @param nodeId Node ID
+     * @return offset in milliseconds
      */
-    public long correctTimestamp(long localTimestamp) {
-        return localTimestamp + clockOffsetMillis;
+    public long getClockOffset(String nodeId) {
+        return nodeClockOffsets.getOrDefault(nodeId, 0L); // Assume 0 offset if unknown
     }
 
     /**
-     * Get current known clock offset.
+     * Correct the timestamp received from a node.
      *
-     * @return offset in milliseconds.
+     * @param nodeId Node ID
+     * @param timestamp Timestamp from that node
+     * @return Corrected timestamp
      */
-    public long getClockOffsetMillis() {
-        return clockOffsetMillis;
+    public long correctTimestamp(String nodeId, long timestamp) {
+        return timestamp + getClockOffset(nodeId);
     }
 }

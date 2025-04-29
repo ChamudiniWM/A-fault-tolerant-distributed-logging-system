@@ -67,8 +67,9 @@
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
-            <version>3.24.2</version>
+            <version>3.21.12</version> <!-- Match with protoc 30.2 -->
         </dependency>
+
 
 
         <!-- RocksDB -->
@@ -152,10 +153,11 @@
         </dependency>
 
         <!-- Optional: JUnit 4 Support -->
+        <!-- https://mvnrepository.com/artifact/junit/junit -->
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>4.13.1</version>
+            <version>4.13.2</version>
             <scope>test</scope>
         </dependency>
 

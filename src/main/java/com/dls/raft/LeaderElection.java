@@ -1,5 +1,6 @@
 package com.dls.raft;
 
+import com.dls.common.LocalLogEntry;
 import com.dls.common.NodeInfo;
 import com.dls.raft.rpc.RaftGrpc;
 import com.dls.raft.rpc.RequestVoteRequest;
@@ -78,16 +79,27 @@ public class LeaderElection {
                 System.out.println("Node " + raftNode.getSelf().getNodeId() + " received a vote, current votes: " + votes);
                 logToLoggingServer("🗳️ Received vote from peer. Total votes: " + votes);
 
-
                 // Check again if still Candidate before becoming Leader
                 if (votes > (raftNode.getPeers().size() + 1) / 2 && raftNode.getState() == RaftState.CANDIDATE) {
                     raftNode.becomeLeader();
                     System.out.println("Node " + raftNode.getSelf().getNodeId() + " became Leader for term " + raftNode.getCurrentTerm());
                     logToLoggingServer("👑 Became Leader for term " + raftNode.getCurrentTerm());
+
+                    //  Append leadership message into the Raft log
+                    LocalLogEntry startupLog = LocalLogEntry.fromLogMessage(
+                            raftNode.getSelf().getNodeId(),
+                            "✅ " + raftNode.getSelf().getNodeId() + " became leader",
+                            System.currentTimeMillis(),
+                            raftNode.getRaftLog().getNextLogIndex(),   // or appropriate method
+                            raftNode.getCurrentTerm()                 // or raftNode.getRaftState().getCurrentTerm()
+                    );
+
+                    raftNode.appendEntryToLog(startupLog);
                 }
             }
         }
     }
+
 
     private void sendRequestVote(NodeInfo peer, RequestVoteRequest request) {
         System.out.println("Attempting to connect to node " + peer.getNodeId() + " at " + peer.getHost() + ":" + peer.getPort());

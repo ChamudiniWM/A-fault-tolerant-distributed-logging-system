@@ -1,6 +1,8 @@
 package com.dls.common;
 
 import com.dls.raft.rpc.LogEntry;  // gRPC-generated LogEntry
+
+import java.util.ArrayList;
 import java.util.List;
 
 public class LocalLogEntry {
@@ -19,6 +21,31 @@ public class LocalLogEntry {
         this.timestamp = timestamp;
         this.id = id;
     }
+
+    // Create a LocalLogEntry from a raw log message (e.g., for LoggingServiceLoggerImpl)
+    public static LocalLogEntry fromLogMessage(String nodeId, String message, long timestamp, int index, int term) {
+        LocalLogEntry entry = new LocalLogEntry(index, term, message, timestamp, nodeId);
+        entry.setMetadata("raw");
+        return entry;
+    }
+
+    public LogEntry toGrpcLogEntry(int index, int term) {
+        return LogEntry.newBuilder()
+                .setCommand(this.getCommand())  // Assuming getCommand() is a method in LocalLogEntry
+                .setIndex(index)
+                .setTerm(term)
+                .build();
+    }
+
+    // Static method to convert a list of LocalLogEntry to List<LogEntry>
+    public static List<LogEntry> fromLocalLogEntryList(List<LocalLogEntry> localLogEntries, int term) {
+        List<LogEntry> grpcEntries = new ArrayList<>();
+        for (LocalLogEntry entry : localLogEntries) {
+            grpcEntries.add(entry.toGrpcLogEntry(grpcEntries.size(), term));  // Pass current index and term
+        }
+        return grpcEntries;
+    }
+
 
     // Convenience constructor if no ID provided
     public LocalLogEntry(int index, int term, String command, long timestamp) {

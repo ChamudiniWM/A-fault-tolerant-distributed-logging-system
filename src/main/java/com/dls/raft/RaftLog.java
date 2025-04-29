@@ -3,12 +3,17 @@ package com.dls.raft;
 import com.dls.common.LocalLogEntry;
 import com.dls.raft.rpc.LogEntry;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class RaftLog {
 
     private final List<LogEntry> logEntries;
     private int commitIndex;
+    //private final Map<String, Integer> nextIndex = new HashMap<>();  // Maps peerId to nextIndex
+   // private final Map<String, Integer> matchIndex = new HashMap<>(); // Maps peerId to matchIndex
+
 
     public RaftLog() {
         this.logEntries = new ArrayList<>();
@@ -36,11 +41,17 @@ public class RaftLog {
         return logEntries.get(prevLogIndex).getTerm() == prevLogTerm;
     }
 
-    public synchronized void appendEntries(List<LocalLogEntry> newEntries) {
-        for (LocalLogEntry entry : newEntries) {
-            logEntries.add(entry.toGrpcLogEntry());
+    public synchronized void appendEntries(List<LocalLogEntry> entries, int term) {
+        for (LocalLogEntry entry : entries) {
+            int newIndex = logEntries.size();
+            entry.setIndex(newIndex);
+            entry.setTerm(term);
+            LogEntry grpcEntry = entry.toGrpcLogEntry();
+            logEntries.add(grpcEntry);
         }
     }
+
+
 
     public synchronized void setCommitIndex(int leaderCommit) {
         int newCommitIndex = Math.min(leaderCommit, getLastLogIndex());
@@ -49,14 +60,25 @@ public class RaftLog {
         }
     }
 
-    public synchronized void appendEntry(LocalLogEntry entry) {
-        logEntries.add(entry.toGrpcLogEntry());
+    public synchronized void appendEntry(LocalLogEntry entry, int term) {
+        int newIndex = logEntries.size();  // 0-based index
+        entry.setIndex(newIndex);
+        entry.setTerm(term);
+        LogEntry grpcEntry = entry.toGrpcLogEntry();
+        logEntries.add(grpcEntry);
     }
+
+
 
 
     public synchronized int getCommitIndex() {
         return commitIndex;
     }
+
+    public synchronized int getNextLogIndex() {
+        return logEntries.size();
+    }
+
 
     public synchronized boolean isUpToDate(int lastLogIndex, int lastLogTerm) {
         int myLastTerm = getLastLogTerm();
