@@ -1,62 +1,93 @@
 package com.dls.server;
 
 import com.dls.common.NodeInfo;
+import com.dls.config.ConfigLoader;
 import com.dls.raft.ConsensusModule;
 import com.dls.raft.LeaderElection;
 import com.dls.raft.RaftNode;
 import com.dls.raft.rpc.RaftServiceGrpcImpl;
+import com.dls.raft.rpc.LogMessage;
+import com.dls.raft.rpc.LoggingServiceGrpc;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 public class ServerMain {
+
     public static void main(String[] args) throws IOException, InterruptedException {
         if (args.length < 1) {
-            System.err.println("Port number is required as a command-line argument.");
+            System.err.println("❌ Port number is required as a command-line argument.");
             System.exit(1);
         }
 
-        // Read the port from the command-line arguments
         int port = Integer.parseInt(args[0]);
+        List<NodeInfo> nodeInfos = ConfigLoader.loadClusterConfig("cluster_config.json");
 
-        // Create a RaftNode instance (you may need to initialize it based on your configuration)
-        NodeInfo selfNodeInfo = new NodeInfo("localhost", "node1", port);  // Use the port from arguments
+        // Find self node based on given port
+        Optional<NodeInfo> optionalSelf = nodeInfos.stream()
+                .filter(n -> n.getPort() == port)
+                .findFirst();
 
-        NodeInfo peer1 = new NodeInfo("localhost", "node2", 50052);
-        NodeInfo peer2 = new NodeInfo("localhost", "node3", 50053);
-        NodeInfo peer3 = new NodeInfo("localhost", "node4", 50054);
+        if (optionalSelf.isEmpty()) {
+            System.err.println("❌ Error: No node configuration found for port " + port);
+            System.exit(1);
+            return;
+        }
 
-        List<NodeInfo> peers = Arrays.asList(peer1, peer2, peer3);
+        NodeInfo selfNodeInfo = optionalSelf.get();
+        System.out.println("✅ Identified self node as " + selfNodeInfo.getNodeId() + " (port " + selfNodeInfo.getPort() + ")");
 
-        // Now, create the RaftNode with these two arguments
+        List<NodeInfo> peers = nodeInfos.stream()
+                .filter(n -> !n.getNodeId().equals(selfNodeInfo.getNodeId()))
+                .toList();
+
+        // Initialize the Raft node
+        System.out.println("🔧 Initializing RaftNode for " + selfNodeInfo.getNodeId() + " with peers: " + peers);
         RaftNode raftNode = new RaftNode(selfNodeInfo, peers);
 
-        // Create a gRPC server and add the RaftService
+        // Create and start the gRPC server
+        System.out.println("🚀 Creating gRPC server for " + selfNodeInfo.getNodeId() + " on port " + selfNodeInfo.getPort());
         Server server = ServerBuilder.forPort(selfNodeInfo.getPort())
                 .addService(new RaftServiceGrpcImpl(
                         new ConsensusModule(raftNode),
                         new LeaderElection(raftNode)
-                ))  // Pass both objects correctly
+                ))
                 .build();
 
-
-        System.out.println("Server is starting on port " + port);
-
-        // Start the server
         server.start();
-        System.out.println("Server started successfully on port " + port);
+        System.out.println("✅ Node " + selfNodeInfo.getNodeId() + " started successfully and is accepting gRPC requests");
 
-        // Add a shutdown hook to gracefully stop the server
+        // Connect to LoggingServer (adjust to match actual port, typically 50056)
+        ManagedChannel loggingChannel = ManagedChannelBuilder.forAddress("localhost", 50056)
+                .usePlaintext()
+                .build();
+        LoggingServiceGrpc.LoggingServiceBlockingStub logStub = LoggingServiceGrpc.newBlockingStub(loggingChannel);
+
+        try {
+            logStub.log(LogMessage.newBuilder()
+                    .setNodeId(selfNodeInfo.getNodeId())
+                    .setMessage("🟢 Node " + selfNodeInfo.getNodeId() + " is up and running on port " + selfNodeInfo.getPort())
+                    .build());
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send log to LoggingServer: " + e.getMessage());
+        }
+
+        // Add shutdown hook for graceful cleanup
+        System.out.println("🛠️  Adding shutdown hook for node " + selfNodeInfo.getNodeId());
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.err.println("Shutting down the server...");
+            System.err.println("🛑 Shutting down node " + selfNodeInfo.getNodeId());
             server.shutdown();
-            System.out.println("Server shut down.");
+            loggingChannel.shutdown();
+            System.out.println("✅ Shutdown complete for node " + selfNodeInfo.getNodeId());
         }));
 
-        // Wait for the server to terminate (blocking)
+        // Keep server running
         server.awaitTermination();
+        System.out.println("🔚 Node " + selfNodeInfo.getNodeId() + " terminated");
     }
 }

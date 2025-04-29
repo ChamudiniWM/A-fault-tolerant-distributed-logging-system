@@ -25,36 +25,44 @@ public class ConsensusModule {
 
     public void broadcastHeartbeats() {
         List<NodeInfo> peers = raftNode.getPeers();
-        Map<NodeInfo, RaftGrpc.RaftStub> stubs = raftNode.getPeerStubs();  // Cached async stubs
+        Map<NodeInfo, RaftGrpc.RaftStub> stubs = raftNode.getPeerStubs();
 
         for (NodeInfo peer : peers) {
             if (peer.getNodeId().equals(raftNode.getSelf().getNodeId())) continue;
 
-            // 🧠 Batch recent log entries (example: last 5)
-            List<LogEntry> recentEntries = raftNode.getRaftLog()
-                    .getEntriesSince(raftNode.getRaftLog().getLastLogIndex() - 4); // last 5 entries
+            String peerId = peer.getNodeId();
+            int nextIndex = raftNode.getNextIndexFor(peerId);  // Follower's next expected log index
+            int prevLogIndex = nextIndex - 1;
+            int prevLogTerm = raftNode.getTermAtIndex(prevLogIndex);
+
+            List<LogEntry> entriesToSend = raftNode.getRaftLog().getEntriesSince(nextIndex);  // Entries from nextIndex onward
 
             AppendEntriesRequest request = AppendEntriesRequest.newBuilder()
                     .setLeaderId(raftNode.getSelf().getNodeId())
                     .setTerm(raftNode.getCurrentTerm())
-                    .setPrevLogIndex(raftNode.getRaftLog().getLastLogIndex())
-                    .setPrevLogTerm(raftNode.getRaftLog().getLastLogTerm())
-                    .addAllEntries(recentEntries)  // Send batched entries
-                    .setLeaderCommit(raftNode.getRaftLog().getCommitIndex())
+                    .setPrevLogIndex(prevLogIndex)
+                    .setPrevLogTerm(prevLogTerm)
+                    .addAllEntries(entriesToSend)
+                    .setLeaderCommit(raftNode.getCommitIndex())
                     .build();
 
-            // Use async stub with a fire-and-forget observer
             stubs.get(peer).appendEntries(request, new StreamObserver<>() {
                 @Override
                 public void onNext(AppendEntriesResponse response) {
-                    if (!response.getSuccess()) {
-                        System.out.println("AppendEntries rejected by " + peer.getNodeId());
-                    } else System.out.println("AppendEntries succeeded for " + peer.getNodeId());
+                    if (response.getSuccess()) {
+                        System.out.println("AppendEntries succeeded for " + peerId);
+                        int newMatchIndex = nextIndex + entriesToSend.size() - 1;
+                        raftNode.advanceMatchIndex(peerId, newMatchIndex);
+                        raftNode.nextIndex.put(peerId, newMatchIndex + 1);
+                    } else {
+                        System.out.println("AppendEntries rejected by " + peerId);
+                        raftNode.decrementNextIndex(peerId);  // Back off
+                    }
                 }
 
                 @Override
                 public void onError(Throwable t) {
-                    System.err.println("AppendEntries RPC to " + peer.getNodeId() + " failed: " + t.getMessage());
+                    System.err.println("AppendEntries RPC to " + peerId + " failed: " + t.getMessage());
                 }
 
                 @Override
@@ -62,6 +70,7 @@ public class ConsensusModule {
             });
         }
     }
+
 
     public void handleNewLogEntry(LogEntry entry) {
         LocalLogEntry localEntry = LocalLogEntry.fromGrpcLogEntry(entry);

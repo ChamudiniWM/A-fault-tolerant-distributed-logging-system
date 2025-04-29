@@ -90,27 +90,42 @@ public class LoggingServer {
         public void log(LogMessage request, StreamObserver<com.google.protobuf.Empty> responseObserver) {
             System.out.printf("📣 [LOG] Node %s: %s%n", request.getNodeId(), request.getMessage());
 
-            long newIndex = raftNode.getRaftLog().getLastLogIndex() + 1;
-            long term = raftNode.getCurrentTerm();
-
+            // Create LocalLogEntry with synchronized timestamp
             LocalLogEntry entry = new LocalLogEntry(
-                    (int) newIndex,
-                    (int) term,
+                    -1, // placeholder index (not using Raft log index)
+                    -1, // placeholder term (not using Raft term)
                     request.getMessage(),
-                    System.currentTimeMillis(),
+                    com.dls.timesync.TimeSynchronizer.getSynchronizedTime().toEpochMilli(),
                     request.getNodeId()
             );
             entry.setData("ExternalLog");
             entry.setMetadata("ViaLoggingServer");
 
-            // Append to Raft log
-            raftNode.getRaftLog().appendEntry(entry, (int) term);
+            // Append to internal log list
+            receivedLogs.add(entry);
 
-            System.out.println("🧾 [Appended Log Entry] " + entry);
+            // If this server is also a RaftNode (optional), append to Raft log
+            if (raftNode != null && raftNode.getRaftLog() != null) {
+                try {
+                    long newIndex = raftNode.getRaftLog().getLastLogIndex() + 1;
+                    long term = raftNode.getCurrentTerm();
+
+                    entry.setIndex((int) newIndex);
+                    entry.setTerm((int) term);
+
+                    raftNode.getRaftLog().appendEntry(entry, (int) term);
+                    System.out.println("🧾 [Appended to Raft Log] " + entry);
+                } catch (Exception e) {
+                    System.err.println("⚠️ Failed to append to Raft log: " + e.getMessage());
+                }
+            } else {
+                System.out.println("ℹ️ Raft node not available — skipping Raft log append.");
+            }
 
             responseObserver.onNext(com.google.protobuf.Empty.getDefaultInstance());
             responseObserver.onCompleted();
         }
+
 
 
     }

@@ -27,7 +27,7 @@ public class RaftNode {
     private final LeaderElection leaderElection;
     private final ConsensusModule consensusModule;
 
-    private final Map<String, Integer> nextIndex = new HashMap<>();  // Maps peerId to nextIndex
+    final Map<String, Integer> nextIndex = new HashMap<>();  // Maps peerId to nextIndex
     private final Map<String, Integer> matchIndex = new HashMap<>(); // Maps peerId to matchIndex
 
 
