@@ -153,6 +153,8 @@ grpc-logger/
 
 ## Running the Prototype
 
+### Method 1: Manual Execution
+
 1. **Build the Project:**
 
    ```bash
@@ -175,6 +177,21 @@ grpc-logger/
    ```bash
    mvn exec:java '-Dexec.mainClass=client.RaftClient'
    ```
+
+---
+
+### Method 2: Using the Batch File (Windows)
+
+Alternatively, you can run everything (nodes + client) with a single command using the provided batch script:
+
+```bash
+start_raft_system.bat
+```
+
+This will:
+
+* Open 3 separate terminals for Raft nodes on ports `50051`, `50052`, and `50053`
+* Launch the client to send logs to the cluster
 
 ---
 
