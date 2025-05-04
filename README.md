@@ -41,28 +41,28 @@ A fault-tolerant, time-synchronized, and replicated distributed logging platform
 ## System Components
 
 ### Fault Tolerance & Failure Detection (Nikini Bandara)
-- Log redundancy via replication (FailoverManager, RecoveryManager)
-- Heartbeat-based failure detection (FailureDetector)
+- Log redundancy via replication
+- Heartbeat-based failure detection
 - Automatic failover and log recovery for rejoining nodes
-- Performance and storage overhead logged in performance_log.csv
+- Performance and storage overhead logged
 
 ### Replication & Consistency (Sithija Oshan)
-- Quorum-based replication (ReplicationManager)
-- Eventual consistency with deduplication (DeduplicationService, ConsistencyChecker)
-- Optimized log retrieval (LogRetriever)
+- Quorum-based replication 
+- Strong consistency with deduplication 
+- Optimized log retrieval 
 - Latency and storage efficiency analysis
 
 ### Time Synchronization (Madara Chamudini)
-- NTP-based synchronization with logical clocks (TimeSynchronizer)
-- Clock skew handling and timestamp correction (ClockSkewHandler, TimestampCorrector)
+- NTP-based synchronization with logical clocks 
+- Clock skew handling and timestamp correction 
 - Reordering out-of-sequence logs
 - Trade-off analysis for synchronization accuracy vs. overhead
 
 ### Consensus (Pavan Kumarage)
-- Custom Raft implementation (ConsensusModule, RaftNode, RaftLog)
-- Leader election for log coordination (LeaderElection)
+- Custom Raft implementation
+- Leader election for log coordination 
 - Performance evaluation under high log ingestion rates
-- Optimizations for consensus overhead (RaftState)
+- Optimizations for consensus overhead
 
 ## Repository Structure
 
