@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package client;
+
+service ClientService {
+  // Client sends a command to the leader
+  rpc SendCommand (ClientCommandRequest) returns (ClientCommandResponse);
+
+  // Client queries logs within a time range
+  rpc queryLogs (LogQueryRequest) returns (LogQueryResponse);
+
+  // Client checks if connected node is leader
+  rpc IsLeader(Empty) returns (IsLeaderResponse);
+
+  rpc GetServerTime(Empty) returns (ServerTimeResponse);
+}
+
+message ServerTimeResponse {
+  int64 timestamp = 1;
+}
+
+// === Command sending ===
+message ClientCommandRequest {
+  string command = 1;
+}
+
+message ClientCommandResponse {
+  bool success = 1;
+  string message = 2;
+  string leader_host = 3; // optional: returned if not the leader
+  int32 leader_port = 4;  // optional: returned if not the leader
+}
+
+// === Log querying ===
+message LogQueryRequest {
+  int64 startTimestamp = 1; // Epoch millis
+  int64 endTimestamp = 2;   // Epoch millis
+  bool ascending = 3;       // true for ASC, false for DESC
+}
+
+message LogEntryData {
+  string command = 1;
+  string logId = 2;
+  int64 timestamp = 3;
+}
+
+message LogQueryResponse {
+  repeated LogEntryData entries = 1;
+}
+
+// === Leadership check ===
+message IsLeaderResponse {
+  bool is_leader = 1;
+  string message = 2;
+  string leader_host = 3;
+  int32 leader_port = 4;
+}
+
+message Empty {}

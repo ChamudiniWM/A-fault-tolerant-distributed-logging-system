@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="NodeServer2" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="raft.NodeServer" />
+    <module name="grpc-logger" />
+    <option name="PROGRAM_PARAMETERS" value="50052" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

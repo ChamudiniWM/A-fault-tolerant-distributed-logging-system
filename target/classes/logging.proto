@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package logging;
+
+option java_multiple_files = true;
+option java_outer_classname = "LoggingProto";
+
+// --- Service Definition ---
+service LogService {
+  rpc Ping (PingRequest) returns (PingResponse);
+
+  // Raft leader election
+  rpc RequestVote (VoteRequest) returns (VoteResponse);
+
+  // Raft log replication & heartbeat
+  rpc AppendEntries (AppendEntriesRequest) returns (AppendEntriesResponse);
+
+  rpc notifyLeaderUpdate (LeaderUpdateRequest) returns (LeaderUpdateResponse);
+
+  rpc GetLogInfo (GetLogInfoRequest) returns (GetLogInfoResponse);
+}
+
+
+message GetLogInfoRequest {}
+
+message GetLogInfoResponse {
+  int32 lastLogIndex = 1;
+  int32 lastLogTerm = 2;
+}
+
+// --- Ping ---
+message PingRequest {
+  string message = 1;
+}
+
+message PingResponse {
+  string message = 1;
+}
+
+message LeaderUpdateRequest {
+  string leaderHost = 1;   // Host of the new leader (could be "localhost" or actual IP)
+  int32 leaderPort = 2;    // Port of the new leader
+}
+
+// Define the LeaderUpdateResponse message (optional, could just be an empty response)
+message LeaderUpdateResponse {
+  bool success = 1;  // True if the update was successful, else false
+}
+
+// --- RequestVote RPC ---
+message VoteRequest {
+  int32 term = 1;
+  string candidateId = 2;
+  int32 lastLogIndex = 3;
+  int32 lastLogTerm = 4;
+}
+
+message VoteResponse {
+  int32 term = 1;
+  bool voteGranted = 2;
+}
+
+// --- AppendEntries (for log replication & heartbeat) ---
+message AppendEntriesRequest {
+  int32 term = 1;
+  string leaderId = 2;
+  int32 prevLogIndex = 3;
+  int32 prevLogTerm = 4;
+  repeated LogEntry entries = 5;
+  int32 leaderCommit = 6;
+}
+
+message AppendEntriesResponse {
+  int32 term = 1;
+  bool success = 2;
+}
+
+// --- Log Entry (Raft Log Structure) ---
+message LogEntry {
+  int32 term = 1;
+  int32 index = 2;
+  string command = 3;
+  string logId = 4;
+  int64 timestamp = 5;
+
+}
