@@ -250,6 +250,9 @@ mvn exec:java '-Dexec.mainClass=client.RaftClient'
   ```bash
   mvn clean install -U
   ```
+  
+* **PowerShell vs CMD:**
+  The commands provided (for starting servers, the client, and handling Maven) are intended to be run **in PowerShell**. These may not work properly in **CMD** due to differences in command execution. Ensure      you're using PowerShell to execute the batch file and related commands.
 
 ---
 
