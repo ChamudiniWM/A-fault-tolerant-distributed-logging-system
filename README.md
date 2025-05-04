@@ -173,7 +173,7 @@ grpc-logger/
    Send logs to the cluster:
 
    ```bash
-   java -cp target/grpc-logger-1.0-SNAPSHOT.jar client.RaftClient.Main --server localhost:50051 --log "Example log entry"
+   mvn exec:java '-Dexec.mainClass=client.RaftClient'
    ```
 
 ---
@@ -187,7 +187,7 @@ mvn "exec:java" "-Dexec.args=50052"
 mvn "exec:java" "-Dexec.args=50053"
 
 # Start a client and send a log
-java -cp target/grpc-logger-1.0-SNAPSHOT.jar client.RaftClient.Main --server localhost:50051 --log "User login event at 10:03 PM"
+mvn exec:java '-Dexec.mainClass=client.RaftClient'
 
 # Logs will be replicated and stored in raft_log_<port>.json across nodes
 ```
