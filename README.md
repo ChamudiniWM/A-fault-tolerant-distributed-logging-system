@@ -158,16 +158,16 @@ grpc-logger/
 1. **Build the Project:**
 
    ```bash
-   mvn package
+   mvn clean install
    ```
 
 2. **Start Raft Node Servers:**
    Each node can be started individually using a specified port:
 
    ```bash
-   mvn "exec:java" "-Dexec.args=50051"
-   mvn "exec:java" "-Dexec.args=50052"
-   mvn "exec:java" "-Dexec.args=50053"
+   mvn "exec:java" '-Dexec.mainClass=raft.NodeServer' "-Dexec.args=50051"
+   mvn "exec:java" '-Dexec.mainClass=raft.NodeServer' "-Dexec.args=50052"
+   mvn "exec:java" '-Dexec.mainClass=raft.NodeServer' "-Dexec.args=50053"
 
    ```
 
