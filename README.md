@@ -1,7 +1,5 @@
 # Distributed Logging System
 
-## Project Title
-
 **Designing a Fault-Tolerant Distributed Logging System**
 
 ## Project Description
